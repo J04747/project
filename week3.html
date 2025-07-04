@@ -1,32 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <style>
-    .box {
-      float: left;
-      margin: 15px;
-      width: 150px;
-      height: 150px;
-      border-radius: 5px;
-      background-color: rgb(207, 34, 22);
-      padding: 1em;
-    }
-
-    .special {
-      background-color: rgb(79, 185, 227);
-      padding: 10px;
-      color: #fff;
-    }
-  </style>
+    <meta charset="utf-8">
+    <title>First HTML5 Web Page</title>
 </head>
-<body>
-  <h1>Simple float example</h1>
-  <div class="box">
-  <img src="New folder/OIP.jpeg" alt="Panda">
-  </div>
+<style>
+       
+body {
+            background-color: mediumpurple;
+            color: black;
+            font-family: Arial, Verdana, sans-serif;
 
-  <p class="special">Lorem ipsum ...... </p>
-  <p>Duis felis ......</p>
+        }
+
+        h1 {
+            background-color: rgb(148, 8, 241);
+            color: mediumpurple;
+            line-height: 200%;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            text-shadow: 3px 3px 5px #CCCCCC;
+            background-image:url("bitmap.png");
+            background-repeat: no-repeat;
+            background-origin: border-box;
+            background-size: cover;
+        }
+  
+
+
+       nav a {
+          display: inline-block;
+          padding: 10px 25px;
+          margin: 0 10px;
+          background-color: #ad20e0; 
+          color: rgb(72, 5, 91);
+          text-decoration: none;
+         font-weight: bold;
+         font-size: 18px;
+         border: 1px solid rgb(45, 5, 75);
+    }
+
+    nav a:hover {
+      background-color: #9818b8;
+    }
+         
+
+        
+
+        h2 {
+            background-color: purple;
+            color: rgb(148, 8, 241);
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            text-align: center;
+        }
+
+
+        p {
+
+            background-image: url("bitmap(1).png");
+            background-repeat: no-repeat;
+            background-position: left center;
+            background-size: 400px 400px;
+            padding-left: 50px;
+
+            height: 0.9em;
+            line-height: 0.9em;
+            text-indent: 3em;
+        }
+        
+
+
+
+</style>
+<body >
+    <h1>Trillium Media Design</h1>
+
+    <!-- Applied .nav class to nav element -->
+    <nav class="nav">
+        <a href="Jay Chew Wei You_24104432_Index.html">Home</a>&emsp;
+        <a href="Jay Chew Wei You_24104432_service.html">Service</a>&emsp;
+        <a href="Jay Chew Wei You _24104432_contact.html">Contact</a>
+    </nav>
+
+    <h2>New Media and Web Design</h2>
+    <p><span class="company">Trillium media design</span> will bring your company web presence to the next level. We offer a comprehensive range of services</p>
+
+    <ul>
+        <li>Website Design</li>
+        <li>Interactive Animation</li>
+        <!-- Applied .feature class to last two list items -->
+        <li class="feature">E-Commerce Solution</li>
+        <li class="feature">Search Engine Optimization</li>
+    </ul>
+
+    <h2>Meeting your business needs</h2>
+    <p>Our expert designers are creative and eager to work with you.</p>
+
+    <!-- Replaced blockquote tag with proper footer structure -->
+    <footer class="footer">
+        &copy; 2019 Sunway University
+    </footer>
 </body>
 </html>
 
