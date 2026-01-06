@@ -1,7 +1,7 @@
 #Benchmarking NoSQL and NewSQL
 
 
-Set up follwing with the link 
+Set up follow to the link 
 https://github.com/brianfrankcooper/YCSB
 
 docker-compose.yml (Save this in your folder)
@@ -155,7 +155,7 @@ wait_for_port localhost 26257
 echo "-> Creating Schema..."
 docker exec bench-cockroach ./cockroach sql --insecure -e "DROP DATABASE IF EXISTS ycsb; CREATE DATABASE ycsb;"
 docker exec bench-cockroach ./cockroach sql --insecure -e \
-"CREATE TABLE ycsb.usertable (
+"CREATE TABLE ycsb.usertable "CREATE TABLE usertable(
   ycsb_key VARCHAR(255) PRIMARY KEY,
   field0 TEXT, field1 TEXT, field2 TEXT, field3 TEXT, field4 TEXT,
   field5 TEXT, field6 TEXT, field7 TEXT, field8 TEXT, field9 TEXT
@@ -233,4 +233,59 @@ $YCSB_BIN run jdbc -s -P $WORKLOAD \
 docker-compose stop tidb
 echo "$RESULTS_DIR/tidb_run.log"
 
+
+run_voltdb.sh(Save this and run this)
+-----------------------------------------------------
+
+#!/bin/bash
+# run_voltdb.sh
+
+# --- CONFIGURATION ---
+YCSB_BIN="./ycsb-0.17.0/bin/ycsb"
+WORKLOAD="workloads/workloada"
+RECORD_COUNT=10000
+OP_COUNT=10000
+RESULTS_DIR="results"
+mkdir -p $RESULTS_DIR
+
+# --- HELPER FUNCTION ---
+wait_for_port() {
+    echo "Waiting for $1:$2..."
+    while ! nc -z $1 $2; do sleep 1; done
+    echo "$1:$2 is UP."
+    sleep 5 # VoltDB needs a few seconds to fully initialize
+}
+
+echo "=== STARTING VOLTDB TEST ==="
+
+# 1. Start Database
+docker-compose up -d voltdb
+wait_for_port localhost 21212
+
+# 2. Create Schema
+# VoltDB requires PRIMARY KEYs to be explicitly NOT NULL in older versions.
+echo "-> Creating Schema..."
+docker exec bench-voltdb sqlcmd --query="CREATE TABLE usertable (
+  YCSB_KEY VARCHAR(255) NOT NULL PRIMARY KEY,
+  FIELD0 VARCHAR(100), FIELD1 VARCHAR(100), FIELD2 VARCHAR(100), FIELD3 VARCHAR(100),
+  FIELD4 VARCHAR(100), FIELD5 VARCHAR(100), FIELD6 VARCHAR(100), FIELD7 VARCHAR(100),
+  FIELD8 VARCHAR(100), FIELD9 VARCHAR(100)
+);"
+
+# 3. Load Data
+echo "-> Loading Data..."
+# We use the 'voltdb' binding. 
+$YCSB_BIN load voltdb -s -P $WORKLOAD \
+    -p voltdb.servers=localhost \
+    -p recordcount=$RECORD_COUNT > $RESULTS_DIR/voltdb_load.log
+
+# 4. Run Benchmark
+echo "-> Running Workload..."
+$YCSB_BIN run voltdb -s -P $WORKLOAD \
+    -p voltdb.servers=localhost \
+    -p operationcount=$OP_COUNT > $RESULTS_DIR/voltdb_run.log
+
+# 5. Stop Database
+docker-compose stop voltdb
+echo "Test Complete. Results saved in $RESULTS_DIR/voltdb_run.log"
 
