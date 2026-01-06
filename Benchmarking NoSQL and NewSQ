@@ -4,4 +4,233 @@
 Set up follwing with the link 
 https://github.com/brianfrankcooper/YCSB
 
+docker-compose.yml (Save this in your folder)
+---------------------------------------------------------
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: bench-mongo
+    ports: ["27017:27017"]
+
+  cassandra:
+    image: cassandra:latest
+    container_name: bench-cassandra
+    ports: ["9042:9042"]
+    environment:
+      - CASSANDRA_CLUSTER_NAME=BenchCluster
+      - CASSANDRA_DC=datacenter1
+
+  cockroachdb:
+    image: cockroachdb/cockroach:latest
+    container_name: bench-cockroach
+    command: start-single-node --insecure
+    ports: ["26257:26257", "8080:8080"]
+
+  tidb:
+    image: pingcap/tidb:latest
+    container_name: bench-tidb
+    ports: ["4000:4000", "10080:10080"]
+
+  voltdb:
+    image: voltdb/voltdb-community:latest
+    container_name: bench-voltdb
+    ports: ["21212:21212", "8081:8080"]
+
+
+
+
+run_mongo.sh(save this file and call this)
+-------------------------------------
+#!/bin/bash
+# run_mongo.sh
+
+# --- CONFIGURATION ---
+YCSB_BIN="./ycsb-0.17.0/bin/ycsb"
+WORKLOAD="workloads/workloada"
+RECORD_COUNT=10000
+OP_COUNT=10000
+RESULTS_DIR="results"
+mkdir -p $RESULTS_DIR
+
+# --- HELPER FUNCTION ---
+wait_for_port() {
+    echo "Waiting for $1:$2..."
+    while ! nc -z $1 $2; do sleep 1; done
+    echo "$1:$2 is UP."
+    sleep 3
+}
+
+# 1. Start Database
+docker-compose up -d mongodb
+wait_for_port localhost 27017
+
+# 2. Load Data (Insert 10k records)
+echo "-> Loading Data..."
+$YCSB_BIN load mongodb -s -P $WORKLOAD -p recordcount=$RECORD_COUNT > $RESULTS_DIR/mongo_load.log
+
+# 3. Run Benchmark (Perform 10k ops)
+echo "-> Running Workload..."
+$YCSB_BIN run mongodb -s -P $WORKLOAD -p operationcount=$OP_COUNT > $RESULTS_DIR/mongo_run.log
+
+# 4. Stop Database
+docker-compose stop mongodb
+echo "Test Complete. Results saved in $RESULTS_DIR/mongo_run.log"
+
+
+
+run_cassandra.sh(Save this and run this)
+---------------------------------------------------
+#!/bin/bash
+# run_cassandra.sh
+
+# --- CONFIGURATION ---
+YCSB_BIN="./ycsb-0.17.0/bin/ycsb"
+WORKLOAD="workloads/workloada"
+RECORD_COUNT=10000
+OP_COUNT=10000
+RESULTS_DIR="results"
+mkdir -p $RESULTS_DIR
+
+# --- HELPER FUNCTION ---
+wait_for_port() {
+    echo "Waiting for $1:$2..."
+    while ! nc -z $1 $2; do sleep 1; done
+    echo "$1:$2 is UP."
+}
+
+
+# 1. Start Database
+docker-compose up -d cassandra
+wait_for_port localhost 9042
+
+echo "-> Waiting 60s for Cassandra initialization (Required)..."
+sleep 60 
+
+# 2. Create Keyspace and Table
+echo "-> Creating Schema..."
+docker exec bench-cassandra cqlsh -e "create keyspace IF NOT EXISTS ycsb WITH REPLICATION = {'class' : 'SimpleStrategy', 'replication_factor': 1 }; USE ycsb; create table IF NOT EXISTS usertable (y_id varchar primary key, field0 varchar, field1 varchar, field2 varchar, field3 varchar, field4 varchar, field5 varchar, field6 varchar, field7 varchar, field8 varchar, field9 varchar);"
+
+# 3. Load Data
+echo "-> Loading Data..."
+$YCSB_BIN load cassandra-cql -s -P $WORKLOAD -p hosts=localhost -p recordcount=$RECORD_COUNT > $RESULTS_DIR/cassandra_load.log
+
+# 4. Run Benchmark
+echo "-> Running Workload..."
+$YCSB_BIN run cassandra-cql -s -P $WORKLOAD -p hosts=localhost -p operationcount=$OP_COUNT > $RESULTS_DIR/cassandra_run.log
+
+# 5. Stop Database
+docker-compose stop cassandra
+echo "$RESULTS_DIR/cassandra_run.log"
+
+
+run_cockroach.sh(Save this and run this)
+---------------------------------------------------------
+#!/bin/bash
+# run_cockroach.sh
+
+# --- CONFIGURATION ---
+YCSB_BIN="./ycsb-0.17.0/bin/ycsb"
+WORKLOAD="workloads/workloada"
+RECORD_COUNT=10000
+OP_COUNT=10000
+RESULTS_DIR="results"
+mkdir -p $RESULTS_DIR
+
+# --- HELPER FUNCTION ---
+wait_for_port() {
+    echo "Waiting for $1:$2..."
+    while ! nc -z $1 $2; do sleep 1; done
+    echo "$1:$2 is UP."
+    sleep 3
+}
+
+echo "=== STARTING COCKROACHDB TEST ==="
+
+# 1. Start Database
+docker-compose up -d cockroachdb
+wait_for_port localhost 26257
+
+# 2. Create Database
+echo "-> Creating Schema..."
+docker exec bench-cockroach ./cockroach sql --insecure -e "DROP DATABASE IF EXISTS ycsb; CREATE DATABASE ycsb;"
+docker exec bench-cockroach ./cockroach sql --insecure -e \
+"CREATE TABLE ycsb.usertable (
+  ycsb_key VARCHAR(255) PRIMARY KEY,
+  field0 TEXT, field1 TEXT, field2 TEXT, field3 TEXT, field4 TEXT,
+  field5 TEXT, field6 TEXT, field7 TEXT, field8 TEXT, field9 TEXT
+);"
+
+# 3. Load Data
+echo "-> Loading Data..."
+$YCSB_BIN load jdbc -s -P $WORKLOAD \
+    -p db.driver=org.postgresql.Driver \
+    -p db.url=jdbc:postgresql://localhost:26257/ycsb?sslmode=disable \
+    -p db.user=root \
+    -p recordcount=$RECORD_COUNT > $RESULTS_DIR/cockroach_load.log
+
+# 4. Run Benchmark
+echo "-> Running Workload..."
+$YCSB_BIN run jdbc -s -P $WORKLOAD \
+    -p db.driver=org.postgresql.Driver \
+    -p db.url=jdbc:postgresql://localhost:26257/ycsb?sslmode=disable \
+    -p db.user=root \
+    -p operationcount=$OP_COUNT > $RESULTS_DIR/cockroach_run.log
+
+# 5. Stop Database
+docker-compose stop cockroachdb
+echo " $RESULTS_DIR/cockroach_run.log"
+
+
+run_tidb.sh(Save this and run this)
+-----------------------------------------------------
+#!/bin/bash
+# run_tidb.sh
+
+# --- CONFIGURATION ---
+YCSB_BIN="./ycsb-0.17.0/bin/ycsb"
+WORKLOAD="workloads/workloada"
+RECORD_COUNT=10000
+OP_COUNT=10000
+RESULTS_DIR="results"
+mkdir -p $RESULTS_DIR
+
+# --- HELPER FUNCTION ---
+wait_for_port() {
+    echo "Waiting for $1:$2..."
+    while ! nc -z $1 $2; do sleep 1; done
+    echo "$1:$2 is UP."
+    sleep 10 # TiDB needs extra warmup time
+}
+
+echo "=== STARTING TiDB TEST ==="
+
+# 1. Start Database
+docker-compose up -d tidb
+wait_for_port localhost 4000
+
+# 2. Create Schema (Uses temporary MySQL container to talk to TiDB)
+echo "-> Creating Schema..."
+docker run --rm --network host mysql:5.7 mysql -h 127.0.0.1 -P 4000 -u root -e "CREATE DATABASE IF NOT EXISTS ycsb; CREATE TABLE IF NOT EXISTS ycsb.usertable (YCSB_KEY VARCHAR(255) PRIMARY KEY, FIELD0 TEXT, FIELD1 TEXT, FIELD2 TEXT, FIELD3 TEXT, FIELD4 TEXT, FIELD5 TEXT, FIELD6 TEXT, FIELD7 TEXT, FIELD8 TEXT, FIELD9 TEXT);"
+
+# 3. Load Data
+echo "-> Loading Data..."
+$YCSB_BIN load jdbc -s -P $WORKLOAD \
+    -p db.driver=com.mysql.cj.jdbc.Driver \
+    -p db.url=jdbc:mysql://localhost:4000/ycsb \
+    -p db.user=root \
+    -p recordcount=$RECORD_COUNT > $RESULTS_DIR/tidb_load.log
+
+# 4. Run Benchmark
+echo "-> Running Workload..."
+$YCSB_BIN run jdbc -s -P $WORKLOAD \
+    -p db.driver=com.mysql.cj.jdbc.Driver \
+    -p db.url=jdbc:mysql://localhost:4000/ycsb \
+    -p db.user=root \
+    -p operationcount=$OP_COUNT > $RESULTS_DIR/tidb_run.log
+
+# 5. Stop Database
+docker-compose stop tidb
+echo "$RESULTS_DIR/tidb_run.log"
+
 
